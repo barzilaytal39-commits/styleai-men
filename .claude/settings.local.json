@@ -5,7 +5,10 @@
       "Bash(npm run *)",
       "Skill(claude-api)",
       "Skill(claude-api:*)",
-      "Bash(awk -F= '/^VITE_SUPABASE_URL=/{print \"URL set, len=\"length\\($2\\)} /^VITE_SUPABASE_ANON_KEY=/{print \"ANON_KEY set, len=\"length\\($2\\)}' .env.local)"
+      "Bash(awk -F= '/^VITE_SUPABASE_URL=/{print \"URL set, len=\"length\\($2\\)} /^VITE_SUPABASE_ANON_KEY=/{print \"ANON_KEY set, len=\"length\\($2\\)}' .env.local)",
+      "Bash(node -e \"const c=require\\('./vercel.json'\\); console.log\\('valid JSON; rewrite source =', c.rewrites[0].source\\)\")",
+      "Bash(node -e \"const re=new RegExp\\('^/\\(\\(?!assets/|.*\\\\\\\\\\\\\\\\..*\\).*\\)\\\\$'\\); for \\(const p of ['/wardrobe','/outfits','/fit-check','/assets/index-abc.js','/sw.js','/manifest.webmanifest','/icon-192.png','/favicon.svg','/']\\) console.log\\(p.padEnd\\(24\\), re.test\\(p\\) ? 'REWRITE→index.html' : 'served as file'\\)\")",
+      "Bash(node -e ' *)"
     ]
   }
 }
