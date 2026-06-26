@@ -76,6 +76,7 @@ hooks + pages, never mixed into auth/profile/wardrobe code.
 | `/`                   | `DashboardPage`     | Intelligence Hub / landing (Phase 4.5A). `HomePage` is now unused |
 | `/profile`            | `ProfilePage`       | Protected                      |
 | `/style-profile`      | `StyleProfilePage`  | Personal Style DNA (Phase 4A); entry from Profile page card + Settings |
+| `/stylist`            | `StylistPage`       | Personal Stylist chat (Phase 7A); Dashboard quick action |
 | `/settings`           | `SettingsPage`      | Protected                      |
 | `/wardrobe`           | `WardrobePage`      | Grid + category filter         |
 | `/wardrobe/insights`  | `WardrobeInsightsPage` | Health score + gaps (Phase 4.5B); entry from Wardrobe + Dashboard |
@@ -374,6 +375,12 @@ ShadCN-style, manually implemented (no CLI), Radix-backed where relevant:
   one `outfits`/`outfit_items` + `weekly_plan_days` per day), `fetchPlans()`,
   `fetchPlan(id)` (embeds days → outfit → items), `setDayWorn(dayId)`. Wear-history
   bumping reuses `useOutfits.markOutfitWorn` in the detail page.
+- `useStylistChat` — Phase 7A. `ask(message, context)` invokes the `stylist-chat`
+  Edge Function and returns `{ data: StylistResponse | null, error }`; maps
+  401/429/422/500/502 + network failures to **Hebrew** fallback messages. Exposes
+  `isAsking`. The `/stylist` page assembles the compact `StylistContext` from
+  `useWardrobe`/`useStyleProfile`/`useWeather`/`useOutfits`/`useFitCheck`/`usePlanner`
+  and keeps the conversation in local component state (no persistence).
 - `useFitCheck` — Phase 4C. `uploadPhoto(file)` (WebP-convert → `outfit-photos`
   bucket → public URL), `analyze(args)` (invokes `fit-check`, maps 401/415/429/500/502
   + network to messages), `saveFitCheck(record)`, `fetchFitChecks()`,
@@ -402,6 +409,19 @@ ShadCN-style, manually implemented (no CLI), Radix-backed where relevant:
   recently added / most versatile. `shoppingGaps(items, styleProfile, weather)` →
   prioritized gaps (missing categories/colors/formality/season + Style-DNA essentials
   for smart-casual/premium + weather-specific boots/coat) with reason + outfit impact.
+- `personal-context.ts` — **Personal Context Engine** (Phase 7B.1). Pure
+  `buildPersonalContext(input)` (no hooks/Supabase) assembles one compact, reusable
+  styling context from already-fetched data: temporal (`weekday`, `season`, `hour`,
+  `time_of_day`), `user` (name/age/height), `style_profile` (DNA summary), `weather`
+  summary, `wardrobe_summary` (totals + per-category + analyzed), `wardrobe_health`
+  (score), `shopping_gaps` (top gaps), `wardrobe_items` (compact metadata, no images,
+  capped 60), `wear_history` (most-worn / 30d-idle / never-worn), and `recent_outfits`
+  / `recent_fit_checks` / `weekly_plan` summaries. Graceful on missing data. The
+  `style_profile`/`weather`/`wardrobe_items`/`recent_outfits`/`recent_fit_checks`/
+  `weekly_plan` keys match what `stylist-chat` already reads; the extra summary fields
+  are sent and **forward-ready** for a future function update (the current function
+  ignores unknown keys — no Edge Function change this phase). Also exports
+  `compactWardrobeItem`.
 - `style-profile-constants.ts` — Personal Style DNA option lists, the
   `StyleProfileFormData` model, `EMPTY_STYLE_PROFILE`, the **`PERSONAL_MODE_PRESET`**
   (electrical project manager preset), `rowToForm`/`formToRow` mappers, and
@@ -479,6 +499,21 @@ reads `ANTHROPIC_API_KEY` from Supabase Edge **secrets** only (never a `VITE_` v
   recommendations. Image-format guard → `415`; reuses `ANTHROPIC_API_KEY`; no DB
   writes (the frontend persists to `fit_checks`). See
   `supabase/functions/fit-check/README.md`.
+- **`stylist-chat`** (Phase 7A; smart-context-aware in 7B.2). `POST { message } +`
+  the full **Smart Context** (Phase 7B.1): `weekday`, `season`, `hour`, `time_of_day`,
+  `user`, `style_profile`, `weather`, `wardrobe_summary`, `wardrobe_health`,
+  `shopping_gaps`, `wardrobe_items`, `wear_history`, `recent_outfits`,
+  `recent_fit_checks`, `weekly_plan`. → Claude (`claude-opus-4-8`, strict tool use) →
+  `{ answer, recommended_item_ids[], fragrance_recommendation, styling_tips[],
+  avoid[], confidence }`. The prompt **actively uses** the context: tailors by
+  time/weekday, honors Style DNA + weather, avoids recently-worn items and surfaces
+  long-unworn ones, raises `shopping_gaps`/`wardrobe_health` only for buying/"what's
+  missing" questions, uses `weekly_plan` for today/this-week questions, avoids issues
+  from `recent_fit_checks`, and always explains *why* (weather/occasion/rotation/color/
+  DNA/fit). **Hebrew** prose; recommends only items whose `id` is in the provided
+  wardrobe metadata (IDs copied exactly). **No images / no auth data**. Reuses
+  `ANTHROPIC_API_KEY`; no DB writes (chat not persisted). See
+  `supabase/functions/stylist-chat/README.md`. **Redeploy required** to activate 7B.2.
 
 ---
 
@@ -584,6 +619,32 @@ reads `ANTHROPIC_API_KEY` from Supabase Edge **secrets** only (never a `VITE_` v
   membership counts from `useOutfits`. Entry points: a TrendingUp button on the
   Wardrobe header and an "Insights →" link on the Dashboard. Loading/empty/error
   states handled; degrades when Style DNA or weather is absent.
+
+**9. Personal Stylist Chat MVP (Phase 7A — DONE)**
+- `/stylist` (`StylistPage`) — reached from a **permanent "Personal Stylist" card on
+  the Dashboard** (icon + title + subtitle) **and** a 5th Dashboard quick action.
+  Mobile-first RTL Hebrew chat: message input (Enter to send, auto-focus after each
+  response, auto-scroll to newest), typing indicator, persistent suggestion chips at
+  the top (מה כדאי ללבוש היום? / איזה בושם מתאים לי? / מה חסר לי בארון?) that send on
+  tap, error bubble + retry.
+  Sends a compact, non-sensitive context (Style DNA summary, weather, wardrobe
+  **metadata only**, recent outfit/fit-check summaries, today's plan) to the
+  `stylist-chat` Edge Function and renders the Hebrew answer, recommended wardrobe
+  items (resolved from returned IDs → cards linking to the item), fragrance, styling
+  tips, and an avoid list. Conversation is **local component state only** (no
+  persistence). `useStylistChat` handles the call + Hebrew error mapping.
+- **Phase 7B.1 — Smart Context Engine:** the page no longer hand-assembles context;
+  it fetches raw data and calls `buildPersonalContext()` (`src/lib/personal-context.ts`),
+  which produces the compact reusable context (now also incl. temporal + wear-history
+  + health + gaps summaries). `useStylistChat.ask(message, ctx)` takes that
+  `PersonalContext`. (7B.1 sent the richer fields; **Phase 7B.2** updates the
+  `stylist-chat` prompt to actively consume them — redeploy required.)
+- **Known limitations:** no chat history persistence, no streaming (single response),
+  no voice/image/WhatsApp/Calendar/shopping links; wardrobe context capped at 60 items;
+  needs `stylist-chat` deployed + `ANTHROPIC_API_KEY`.
+- **Future roadmap:** persist conversations (table + RLS), streaming responses,
+  multi-turn memory, deep-link "build this outfit" from a recommendation, and
+  voice/calendar integrations.
 
 **8. Polish & Reliability (Phase 4.5C — DONE)**
 - Fixed unreachable `/settings` (Profile gear link). Standardized score display to

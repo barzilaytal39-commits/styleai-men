@@ -18,6 +18,7 @@ import { OutfitBuilderPage } from '@/pages/OutfitBuilderPage'
 import { SavedOutfitsPage } from '@/pages/SavedOutfitsPage'
 import { SavedOutfitDetailPage } from '@/pages/SavedOutfitDetailPage'
 import { StyleProfilePage } from '@/pages/StyleProfilePage'
+import { StylistPage } from '@/pages/StylistPage'
 import { FitCheckPage } from '@/pages/FitCheckPage'
 import { FitCheckDetailPage } from '@/pages/FitCheckDetailPage'
 import { WeeklyPlannerPage } from '@/pages/WeeklyPlannerPage'
@@ -74,6 +75,7 @@ export function AppRouter() {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/style-profile" element={<StyleProfilePage />} />
+        <Route path="/stylist" element={<StylistPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/wardrobe" element={<WardrobePage />} />
         <Route path="/wardrobe/insights" element={<WardrobeInsightsPage />} />

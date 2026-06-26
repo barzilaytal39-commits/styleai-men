@@ -48,6 +48,8 @@ export const he = {
     actionPlanner: 'תכנון שבועי',
     actionWardrobe: 'ארון',
     actionBuild: 'בנה לוק',
+    actionStylist: 'סטייליסט אישי',
+    stylistSubtitle: 'שאל אותי כל דבר על הסטייל שלך',
     wardrobe: 'ארון',
     insights: 'תובנות →',
     statItems: 'פריטים',

@@ -8,6 +8,7 @@ import {
   CloudSun,
   Lightbulb,
   ChevronRight,
+  MessageCircle,
 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Badge } from '@/components/ui/badge'
@@ -247,6 +248,7 @@ export function DashboardPage() {
   const recentlySaved = useMemo(() => outfits.slice(0, 3), [outfits])
 
   const quickActions = [
+    { to: '/stylist', label: t.dashboard.actionStylist, icon: MessageCircle },
     { to: '/fit-check', label: t.dashboard.actionFitCheck, icon: ScanLine },
     { to: '/planner', label: t.dashboard.actionPlanner, icon: CalendarDays },
     { to: '/wardrobe', label: t.dashboard.actionWardrobe, icon: Shirt },
@@ -280,6 +282,21 @@ export function DashboardPage() {
             </p>
           )}
         </div>
+
+        {/* Personal Stylist entry */}
+        <Link
+          to="/stylist"
+          className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition-colors hover:bg-accent/40"
+        >
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-foreground text-background">
+            <MessageCircle className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">{t.dashboard.actionStylist}</p>
+            <p className="text-xs text-muted-foreground">{t.dashboard.stylistSubtitle}</p>
+          </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Link>
 
         {/* Today's recommendation */}
         <section>
