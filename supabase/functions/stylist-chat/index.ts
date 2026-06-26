@@ -41,6 +41,7 @@ interface StylistRequest {
   // who / preferences / environment
   user?: Record<string, unknown> | null;
   style_profile?: Record<string, unknown> | null;
+  style_memory?: Record<string, unknown> | null;
   weather?: Record<string, unknown> | null;
   // wardrobe
   wardrobe_summary?: Record<string, unknown> | null;
@@ -134,6 +135,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
     "- `wear_history`: avoid recently-worn or overused items when reasonable; when an item hasn't " +
     "been worn in a long time and still fits the brief, suggest bringing it back (mention it).\n" +
     "- `recent_outfits`: don't just repeat them — add variety.\n" +
+    "- `style_memory`: learned preferences over time — lean into `favorite_*` and " +
+    "`learned_preferences`, respect `learned_avoids`, and weight them more as `confidence` " +
+    "rises (but never override weather/occasion/formality).\n" +
     "- `recent_fit_checks`: avoid repeating known issues raised there.\n" +
     "- `weekly_plan`: use it when the question is about today / tomorrow / this week.\n" +
     "- `shopping_gaps` + `wardrobe_health`: bring these up ONLY when the user asks about buying, " +
@@ -156,6 +160,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     })}\n` +
     `User: ${JSON.stringify(body.user ?? null)}\n` +
     `Style DNA: ${JSON.stringify(body.style_profile ?? null)}\n` +
+    `Style memory (learned): ${JSON.stringify(body.style_memory ?? null)}\n` +
     `Weather: ${JSON.stringify(body.weather ?? null)}\n` +
     `Wardrobe summary: ${JSON.stringify(body.wardrobe_summary ?? null)}\n` +
     `Wardrobe health: ${JSON.stringify(body.wardrobe_health ?? null)}\n` +

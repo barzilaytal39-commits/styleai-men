@@ -9,6 +9,7 @@ import {
   Lightbulb,
   ChevronRight,
   MessageCircle,
+  Brain,
 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Badge } from '@/components/ui/badge'
@@ -321,6 +322,7 @@ export function DashboardPage() {
     { to: '/planner', label: t.dashboard.actionPlanner, icon: CalendarDays },
     { to: '/wardrobe', label: t.dashboard.actionWardrobe, icon: Shirt },
     { to: '/outfits', label: t.dashboard.actionBuild, icon: Sparkles },
+    { to: '/memory', label: t.dashboard.actionMemory, icon: Brain },
   ]
 
   return (

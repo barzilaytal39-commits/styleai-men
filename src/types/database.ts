@@ -369,6 +369,63 @@ export interface Database {
         }
         Relationships: []
       }
+      style_memory: {
+        Row: {
+          id: string
+          user_id: string
+          favorite_styles: string[]
+          favorite_colors: string[]
+          favorite_brands: string[]
+          favorite_fragrances: string[]
+          favorite_watches: string[]
+          favorite_accessories: string[]
+          preferred_formality: number | null
+          preferred_fits: Json
+          learned_avoids: string[]
+          learned_preferences: string[]
+          confidence: number
+          feedback_counts: Json
+          saved_recommendations: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          favorite_styles?: string[]
+          favorite_colors?: string[]
+          favorite_brands?: string[]
+          favorite_fragrances?: string[]
+          favorite_watches?: string[]
+          favorite_accessories?: string[]
+          preferred_formality?: number | null
+          preferred_fits?: Json
+          learned_avoids?: string[]
+          learned_preferences?: string[]
+          confidence?: number
+          feedback_counts?: Json
+          saved_recommendations?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          favorite_styles?: string[]
+          favorite_colors?: string[]
+          favorite_brands?: string[]
+          favorite_fragrances?: string[]
+          favorite_watches?: string[]
+          favorite_accessories?: string[]
+          preferred_formality?: number | null
+          preferred_fits?: Json
+          learned_avoids?: string[]
+          learned_preferences?: string[]
+          confidence?: number
+          feedback_counts?: Json
+          saved_recommendations?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       weekly_plan_days: {
         Row: {
           id: string

@@ -10,12 +10,13 @@
 // already reads; the remaining summary fields are extra context (sent but ignored
 // by the current function, ready for future server-side use).
 
-import type { Profile, StyleProfile, WardrobeItem, WardrobeCategory } from '@/types'
+import type { Profile, StyleProfile, StyleMemory, WardrobeItem, WardrobeCategory } from '@/types'
 import type { WeatherContext } from '@/lib/weather'
 import type { SavedOutfit } from '@/hooks/useOutfits'
 import type { PlanDayWithOutfit } from '@/hooks/usePlanner'
 import { summarizeWeatherForAI } from '@/lib/weather'
 import { buildProfileSummary } from '@/lib/style-profile-constants'
+import { summarizeMemoryForAI } from '@/lib/style-memory'
 import { wardrobeHealth, shoppingGaps } from '@/lib/wardrobe-insights'
 
 const MAX_ITEMS = 60
@@ -29,6 +30,7 @@ export interface PersonalContextInput {
   recentOutfits?: SavedOutfit[]
   recentFitChecks?: { overall_score: number | null; final_verdict: string | null }[]
   todayPlanDay?: PlanDayWithOutfit | null
+  styleMemory?: StyleMemory | null
   now?: Date
 }
 
@@ -42,6 +44,7 @@ export interface PersonalContext {
   user: { name?: string; age?: number; height_cm?: number } | null
   // preferences / environment
   style_profile: Record<string, unknown> | null
+  style_memory: Record<string, unknown> | null
   weather: Record<string, unknown> | null
   // wardrobe
   wardrobe_summary: { total: number; analyzed: number; by_category: Record<string, number> }
@@ -180,6 +183,7 @@ export function buildPersonalContext(input: PersonalContextInput = {}): Personal
     ...temporal,
     user,
     style_profile: input.styleProfile ? buildProfileSummary(input.styleProfile) : null,
+    style_memory: summarizeMemoryForAI(input.styleMemory ?? null),
     weather: input.weather ? summarizeWeatherForAI(input.weather) : null,
     wardrobe_summary,
     wardrobe_health,

@@ -1,6 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Send, Sparkles, Shirt, Wand2, Lightbulb, AlertTriangle, RotateCcw } from 'lucide-react'
+import {
+  Send,
+  Sparkles,
+  Shirt,
+  Wand2,
+  Lightbulb,
+  AlertTriangle,
+  RotateCcw,
+  ThumbsUp,
+  ThumbsDown,
+  Heart,
+  Bookmark,
+} from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,9 +23,12 @@ import { useOutfits, type SavedOutfit } from '@/hooks/useOutfits'
 import { useFitCheck } from '@/hooks/useFitCheck'
 import { usePlanner, type PlanDayWithOutfit } from '@/hooks/usePlanner'
 import { useStylistChat, type StylistResponse } from '@/hooks/useStylistChat'
+import { useStyleMemory } from '@/hooks/useStyleMemory'
 import { useAuthStore } from '@/store/authStore'
+import { useToast } from '@/components/ui/toaster'
 import { buildPersonalContext } from '@/lib/personal-context'
-import type { StyleProfile, WardrobeItem, FitCheck } from '@/types'
+import type { FeedbackKind } from '@/lib/style-memory'
+import type { StyleProfile, WardrobeItem, FitCheck, StyleMemory } from '@/types'
 
 const SUGGESTED = ['מה כדאי ללבוש היום?', 'איזה בושם מתאים לי?', 'מה חסר לי בארון?']
 
@@ -30,12 +45,15 @@ export function StylistPage() {
   const { fetchFitChecks } = useFitCheck()
   const { fetchPlans, fetchPlan } = usePlanner()
   const { ask, isAsking } = useStylistChat()
+  const { fetchMemory, recordFeedback } = useStyleMemory()
   const profile = useAuthStore((s) => s.profile)
+  const { toast } = useToast()
 
   const [styleProfile, setStyleProfile] = useState<StyleProfile | null>(null)
   const [recentOutfits, setRecentOutfits] = useState<SavedOutfit[]>([])
   const [recentFitChecks, setRecentFitChecks] = useState<FitCheck[]>([])
   const [todayPlanDay, setTodayPlanDay] = useState<PlanDayWithOutfit | null>(null)
+  const [memory, setMemory] = useState<StyleMemory | null>(null)
 
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
@@ -51,16 +69,18 @@ export function StylistPage() {
   useEffect(() => {
     let active = true
     void (async () => {
-      const [profileRes, outfitsRes, fitRes, plansRes] = await Promise.all([
+      const [profileRes, outfitsRes, fitRes, plansRes, memRes] = await Promise.all([
         fetchStyleProfile(),
         fetchOutfits(),
         fetchFitChecks(),
         fetchPlans(),
+        fetchMemory(),
       ])
       if (!active) return
       if (profileRes.data) setStyleProfile(profileRes.data)
       setRecentOutfits(outfitsRes.data)
       setRecentFitChecks(fitRes.data)
+      if (memRes.data) setMemory(memRes.data)
       if (plansRes.data.length > 0) {
         const { data: full } = await fetchPlan(plansRes.data[0].id)
         if (active && full) {
@@ -72,7 +92,7 @@ export function StylistPage() {
     return () => {
       active = false
     }
-  }, [fetchStyleProfile, fetchOutfits, fetchFitChecks, fetchPlans, fetchPlan])
+  }, [fetchStyleProfile, fetchOutfits, fetchFitChecks, fetchPlans, fetchPlan, fetchMemory])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -87,7 +107,28 @@ export function StylistPage() {
       recentOutfits,
       recentFitChecks,
       todayPlanDay,
+      styleMemory: memory,
     })
+
+  const FEEDBACK_TOAST: Record<FeedbackKind, string> = {
+    helped: 'תודה! אזכור שזה עזר.',
+    not_helped: 'תודה על המשוב.',
+    loved: 'מעולה! הוספתי את הסגנון להעדפות שלך.',
+    saved: 'ההמלצה נשמרה.',
+  }
+
+  const handleFeedback = async (kind: FeedbackKind, data: StylistResponse) => {
+    const recItems = data.recommended_item_ids
+      .map((id) => items.find((i) => i.id === id))
+      .filter(Boolean) as WardrobeItem[]
+    const { data: updated, error } = await recordFeedback(memory, kind, recItems, data.answer)
+    if (error) {
+      toast({ title: 'השמירה נכשלה', description: error.message, variant: 'destructive' })
+      return
+    }
+    if (updated) setMemory(updated)
+    toast({ title: FEEDBACK_TOAST[kind] })
+  }
 
   const send = async (text: string) => {
     const trimmed = text.trim()
@@ -238,6 +279,28 @@ export function StylistPage() {
                   </ul>
                 </div>
               )}
+
+              {/* Feedback — updates Style Memory */}
+              <div className="flex flex-wrap gap-2 pt-0.5">
+                {(
+                  [
+                    { kind: 'helped' as const, icon: ThumbsUp, label: 'עזר' },
+                    { kind: 'not_helped' as const, icon: ThumbsDown, label: 'לא עזר' },
+                    { kind: 'loved' as const, icon: Heart, label: 'אוהב את הסגנון' },
+                    { kind: 'saved' as const, icon: Bookmark, label: 'שמור המלצה' },
+                  ]
+                ).map(({ kind, icon: Icon, label }) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => void handleFeedback(kind, data)}
+                    className="flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium transition-colors hover:border-foreground/40"
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
           )
         })}

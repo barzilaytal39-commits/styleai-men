@@ -76,7 +76,8 @@ hooks + pages, never mixed into auth/profile/wardrobe code.
 | `/`                   | `DashboardPage`     | Intelligence Hub / landing (Phase 4.5A). `HomePage` is now unused |
 | `/profile`            | `ProfilePage`       | Protected                      |
 | `/style-profile`      | `StyleProfilePage`  | Personal Style DNA (Phase 4A); entry from Profile page card + Settings |
-| `/stylist`            | `StylistPage`       | Personal Stylist chat (Phase 7A); Dashboard quick action |
+| `/stylist`            | `StylistPage`       | Personal Stylist chat (Phase 7A); Dashboard card + quick action |
+| `/memory`             | `MemoryInspectorPage` | Adaptive Style Memory inspector (Phase 7D); Dashboard quick action |
 | `/settings`           | `SettingsPage`      | Protected                      |
 | `/wardrobe`           | `WardrobePage`      | Grid + category filter         |
 | `/wardrobe/insights`  | `WardrobeInsightsPage` | Health score + gaps (Phase 4.5B); entry from Wardrobe + Dashboard |
@@ -135,6 +136,9 @@ On a brand-new/empty Supabase project, run these in the SQL Editor top-to-bottom
    existing `outfit-photos` storage bucket for photos (no new bucket).
 5. `supabase/migrations/20260620020000_weekly_plans.sql` — creates `weekly_plans`
    and `weekly_plan_days` (Weekly Planner) with owner-only RLS. Idempotent, additive.
+6. `supabase/migrations/20260626000000_style_memory.sql` — creates `style_memory`
+   (Adaptive Style Memory, Phase 7D): one row per user of **structured learned
+   preferences** (no chat history), owner-only RLS + `updated_at` trigger. Additive.
 
 After both run, the live DB matches `src/types/database.ts`.
 
@@ -243,6 +247,14 @@ Check). `outfit_ratings` remains unused/unmirrored — add it when its feature i
   `generated_at`. Owner-only RLS on both (`weekly_plan_days` carries its own
   `user_id` for direct policies). Saving a plan also creates one `outfits` row +
   `outfit_items` per day.
+
+- **`style_memory`** (Phase 7D) — one row per user (`user_id` UNIQUE) of **structured
+  learned preferences only** (never raw chat): `favorite_styles/colors/brands/
+  fragrances/watches/accessories` (text[]), `preferred_formality`, `preferred_fits`
+  (jsonb), `learned_preferences`, `learned_avoids` (text[]), `confidence` (numeric),
+  `feedback_counts` (jsonb), `saved_recommendations` (jsonb), timestamps. Owner-only
+  RLS. Updated by the Memory Engine from Stylist feedback; summarized into the Smart
+  Context for the stylist.
 
 ### Row-level security
 
@@ -383,6 +395,10 @@ ShadCN-style, manually implemented (no CLI), Radix-backed where relevant:
   one `outfits`/`outfit_items` + `weekly_plan_days` per day), `fetchPlans()`,
   `fetchPlan(id)` (embeds days → outfit → items), `setDayWorn(dayId)`. Wear-history
   bumping reuses `useOutfits.markOutfitWorn` in the detail page.
+- `useStyleMemory` — Phase 7D. `fetchMemory()` (maybeSingle), `recordFeedback(current,
+  kind, items, savedText?)` (applies `applyFeedback` → upsert on `user_id`, returns the
+  updated row), and `resetMemory()` (deletes the row). Used by the Stylist feedback
+  buttons and the Memory Inspector.
 - `useMorningBriefing` — Phase 7C. `generate(context)` invokes the `morning-briefing`
   Edge Function and returns `{ data: MorningBriefing | null, error }`; maps
   401/429/500/502 + network failures to **Hebrew** messages. Exposes `isGenerating`.
@@ -420,6 +436,13 @@ ShadCN-style, manually implemented (no CLI), Radix-backed where relevant:
   recently added / most versatile. `shoppingGaps(items, styleProfile, weather)` →
   prioritized gaps (missing categories/colors/formality/season + Style-DNA essentials
   for smart-casual/premium + weather-specific boots/coat) with reason + outfit impact.
+- `style-memory.ts` — **Adaptive Style Memory engine** (Phase 7D, pure). Two layers:
+  *session* (component state during a chat) and *persistent* (`style_memory` table).
+  `applyFeedback(current, kind, items, savedText?)` derives the next persistent values
+  from a feedback event (👍 helped / 👎 not_helped / ❤️ loved / 💾 saved) — bumps
+  `confidence`, accumulates favorites from the reacted items, appends saved recs.
+  `summarizeMemoryForAI(memory)` produces the compact, preferences-only summary fed
+  into the Smart Context. All tokens internal English.
 - `personal-context.ts` — **Personal Context Engine** (Phase 7B.1). Pure
   `buildPersonalContext(input)` (no hooks/Supabase) assembles one compact, reusable
   styling context from already-fetched data: temporal (`weekday`, `season`, `hour`,
@@ -676,6 +699,23 @@ reads `ANTHROPIC_API_KEY` from Supabase Edge **secrets** only (never a `VITE_` v
   top pick, "לפי כללים" badge) and the Dashboard still renders. A **regenerate** button
   forces a fresh briefing. Cached in local component state only (not persisted).
   Needs `morning-briefing` deployed + `ANTHROPIC_API_KEY`.
+
+**11. Adaptive Style Memory (Phase 7D — DONE)**
+- New `style_memory` table (structured learned preferences only — **no chat history**)
+  + Memory Engine (`src/lib/style-memory.ts`) + `useStyleMemory`.
+- **Feedback buttons** under every Stylist answer (👍 עזר / 👎 לא עזר / ❤️ אוהב את
+  הסגנון / 💾 שמור המלצה) update persistent memory via `applyFeedback` (confidence +
+  accumulated favorites/saved recs). Session memory = the in-chat state; persistent =
+  the table.
+- The Stylist **reads memory before answering**: `buildPersonalContext` now includes a
+  `style_memory` summary, and the `stylist-chat` prompt leans into learned
+  favorites/avoids (weighted by confidence; never overrides weather/occasion/formality)
+  — **redeploy `stylist-chat`** to activate.
+- **Memory Inspector** at `/memory` (`MemoryInspectorPage`, Dashboard quick action):
+  shows learned favorites, preferences, avoids, confidence bar, last-updated, and a
+  **reset** (delete row) with confirm. Hebrew UI; internal tokens English.
+- **Pending:** memory only learns from explicit Stylist feedback for now (no passive
+  inference from worn/saved history yet); morning-briefing doesn't consume it yet.
 
 **8. Polish & Reliability (Phase 4.5C — DONE)**
 - Fixed unreachable `/settings` (Profile gear link). Standardized score display to

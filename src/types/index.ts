@@ -27,6 +27,10 @@ export type WeeklyPlanDayInsert = Database['public']['Tables']['weekly_plan_days
 
 export type PlanMode = 'work_week' | 'full_week'
 
+export type StyleMemory = Database['public']['Tables']['style_memory']['Row']
+export type StyleMemoryInsert = Database['public']['Tables']['style_memory']['Insert']
+export type StyleMemoryUpdate = Database['public']['Tables']['style_memory']['Update']
+
 export type WardrobeCategory = 'tops' | 'bottoms' | 'outerwear' | 'shoes' | 'accessories'
 
 export type OutfitSlot =
