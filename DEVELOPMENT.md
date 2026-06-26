@@ -334,6 +334,14 @@ ShadCN-style, manually implemented (no CLI), Radix-backed where relevant:
   suggestions, fragrance, and final verdict. Shared by the live result and the saved
   detail page.
 
+### Dashboard — `src/components/dashboard/`
+
+- `MorningBriefingCard` — renders the proactive daily briefing (Phase 7C): greeting,
+  summary, recommended item thumbnails (resolved from IDs → links), why-this-look
+  list, and fragrance / watch-accessory / rotation / wardrobe-tip / shopping-gap
+  notes, plus a regenerate (refresh) button and an AI-vs-"לפי כללים" source badge.
+  Presentational only — the Dashboard owns fetching/fallback.
+
 ### Planner — `src/components/planner/`
 
 - `PlanDayCard` — one day in a weekly plan (Phase 4D): weekday/date, occasion,
@@ -375,6 +383,9 @@ ShadCN-style, manually implemented (no CLI), Radix-backed where relevant:
   one `outfits`/`outfit_items` + `weekly_plan_days` per day), `fetchPlans()`,
   `fetchPlan(id)` (embeds days → outfit → items), `setDayWorn(dayId)`. Wear-history
   bumping reuses `useOutfits.markOutfitWorn` in the detail page.
+- `useMorningBriefing` — Phase 7C. `generate(context)` invokes the `morning-briefing`
+  Edge Function and returns `{ data: MorningBriefing | null, error }`; maps
+  401/429/500/502 + network failures to **Hebrew** messages. Exposes `isGenerating`.
 - `useStylistChat` — Phase 7A. `ask(message, context)` invokes the `stylist-chat`
   Edge Function and returns `{ data: StylistResponse | null, error }`; maps
   401/429/422/500/502 + network failures to **Hebrew** fallback messages. Exposes
@@ -514,6 +525,15 @@ reads `ANTHROPIC_API_KEY` from Supabase Edge **secrets** only (never a `VITE_` v
   wardrobe metadata (IDs copied exactly). **No images / no auth data**. Reuses
   `ANTHROPIC_API_KEY`; no DB writes (chat not persisted). See
   `supabase/functions/stylist-chat/README.md`. **Redeploy required** to activate 7B.2.
+- **`morning-briefing`** (Phase 7C, proactive daily briefing). `POST { context }` (a
+  `PersonalContext` from `buildPersonalContext`) → Claude (`claude-opus-4-8`, strict
+  tool use) → `{ greeting, summary, recommended_item_ids[], fragrance_recommendation,
+  watch_or_accessory_recommendation, why_this_look[], rotation_note, wardrobe_tip,
+  shopping_gap_tip, confidence }`. **Hebrew** prose; recommends only IDs from
+  `context.wardrobe_items` (no invented items); uses weather/time/weekday/DNA/plan/
+  wear-history/health/gaps/fit-checks; compact for the dashboard. Reuses
+  `ANTHROPIC_API_KEY`; no DB writes (not persisted). See
+  `supabase/functions/morning-briefing/README.md`.
 
 ---
 
@@ -645,6 +665,17 @@ reads `ANTHROPIC_API_KEY` from Supabase Edge **secrets** only (never a `VITE_` v
 - **Future roadmap:** persist conversations (table + RLS), streaming responses,
   multi-turn memory, deep-link "build this outfit" from a recommendation, and
   voice/calendar integrations.
+
+**10. AI Morning Briefing (Phase 7C — DONE)**
+- A proactive `MorningBriefingCard` on the Dashboard (under the greeting, above
+  Today's Outfit) calls `morning-briefing` with `buildPersonalContext()` and shows a
+  Hebrew daily recommendation: greeting, summary, item cards, fragrance, watch/
+  accessory, why-this-look, rotation note, wardrobe tip, shopping-gap tip. Fires
+  **exactly once** after dashboard data settles (`briefingRanRef` guard — no infinite
+  retry); on AI failure it shows a **rule-based fallback** briefing (`buildOutfits`
+  top pick, "לפי כללים" badge) and the Dashboard still renders. A **regenerate** button
+  forces a fresh briefing. Cached in local component state only (not persisted).
+  Needs `morning-briefing` deployed + `ANTHROPIC_API_KEY`.
 
 **8. Polish & Reliability (Phase 4.5C — DONE)**
 - Fixed unreachable `/settings` (Profile gear link). Standardized score display to

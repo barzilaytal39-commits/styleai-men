@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Sparkles,
@@ -20,7 +20,10 @@ import { useOutfits, type SavedOutfit } from '@/hooks/useOutfits'
 import { useFitCheck } from '@/hooks/useFitCheck'
 import { usePlanner, type PlanDayWithOutfit } from '@/hooks/usePlanner'
 import { useOutfitRanking, type AIRanking } from '@/hooks/useOutfitRanking'
+import { useMorningBriefing, type MorningBriefing } from '@/hooks/useMorningBriefing'
+import { MorningBriefingCard } from '@/components/dashboard/MorningBriefingCard'
 import { buildProfileSummary } from '@/lib/style-profile-constants'
+import { buildPersonalContext } from '@/lib/personal-context'
 import { buildOutfits, type GeneratedOutfit, type OutfitBrief, type Occasion } from '@/lib/outfit-engine'
 import { formatDate } from '@/lib/utils'
 import { t, styleLabel, occasionLabel } from '@/i18n'
@@ -117,6 +120,7 @@ export function DashboardPage() {
   const { fetchFitChecks } = useFitCheck()
   const { fetchPlans, fetchPlan } = usePlanner()
   const { rankOutfits } = useOutfitRanking()
+  const { generate: generateBriefing, isGenerating: isBriefingLoading } = useMorningBriefing()
 
   const firstName = profile?.full_name?.split(' ')[0] ?? user?.email?.split('@')[0] ?? 'there'
 
@@ -136,6 +140,12 @@ export function DashboardPage() {
   // Guards the "today's outfit" recommendation so AI ranking runs at most once per
   // relevant input change — and never auto-retries on failure (prevents call loop).
   const recRanRef = useRef<string | null>(null)
+
+  // Morning briefing (Phase 7C). Runs once per signature; rule fallback on failure.
+  const [briefing, setBriefing] = useState<MorningBriefing | null>(null)
+  const [briefingSource, setBriefingSource] = useState<'ai' | 'rule' | null>(null)
+  const [briefingReady, setBriefingReady] = useState(false)
+  const briefingRanRef = useRef(false)
 
   useEffect(() => {
     if (!isLoaded) void fetchItems()
@@ -165,6 +175,7 @@ export function DashboardPage() {
           setTodayPlanDay(full.days.find((d) => d.day === todayISO()) ?? null)
         }
       }
+      if (active) setBriefingReady(true)
     })()
     return () => {
       active = false
@@ -222,6 +233,63 @@ export function DashboardPage() {
       active = false
     }
   }, [isLoaded, items, styleProfile, weather, rankOutfits])
+
+  // ---- morning briefing (Phase 7C) ----
+  // Deterministic rule fallback used when the AI briefing is unavailable.
+  const buildRuleBriefing = useCallback((): MorningBriefing => {
+    const occasion = ((styleProfile?.typical_day_types?.[0] as Occasion) ?? 'Office') as Occasion
+    const brief: OutfitBrief = {
+      occasion,
+      locationType: 'Indoor',
+      desiredStyle: styleProfile?.preferred_style?.trim() || 'Smart Casual',
+      formalityLevel: styleProfile?.preferred_formality ?? 3,
+    }
+    const top = buildOutfits(items, brief, weather ?? undefined)[0]
+    const ids = top ? (Object.values(top.slots).filter(Boolean) as WardrobeItem[]).map((i) => i.id) : []
+    return {
+      greeting: getGreeting(),
+      summary: top
+        ? 'הנה הצעה מהירה להיום על סמך הארון ומזג האוויר.'
+        : 'הוסף עוד פריטים לארון כדי לקבל הצעה יומית.',
+      recommended_item_ids: ids,
+      fragrance_recommendation: '',
+      watch_or_accessory_recommendation: '',
+      why_this_look: top ? ['הרכבה מאוזנת לפי הסגנון ומזג האוויר.'] : [],
+      rotation_note: '',
+      wardrobe_tip: '',
+      shopping_gap_tip: '',
+      confidence: 0,
+    }
+  }, [items, styleProfile, weather])
+
+  const runBriefing = useCallback(async () => {
+    const ctx = buildPersonalContext({
+      profile,
+      styleProfile,
+      weather,
+      items,
+      recentOutfits: outfits,
+      recentFitChecks: lastFitCheck ? [lastFitCheck] : [],
+      todayPlanDay,
+    })
+    const { data } = await generateBriefing(ctx)
+    if (data) {
+      setBriefing(data)
+      setBriefingSource('ai')
+    } else {
+      setBriefing(buildRuleBriefing())
+      setBriefingSource('rule')
+    }
+  }, [profile, styleProfile, weather, items, outfits, lastFitCheck, todayPlanDay, generateBriefing, buildRuleBriefing])
+
+  // Fire exactly once after the dashboard data has settled (ref-guarded → one call).
+  useEffect(() => {
+    if (!isLoaded || !briefingReady || briefingRanRef.current) return
+    briefingRanRef.current = true
+    void runBriefing()
+  }, [isLoaded, briefingReady, runBriefing])
+
+  const handleRegenerateBriefing = () => void runBriefing()
 
   // ---- derived stats ----
   const stats = useMemo(() => {
@@ -282,6 +350,15 @@ export function DashboardPage() {
             </p>
           )}
         </div>
+
+        {/* Morning briefing (Phase 7C) — proactive daily recommendation */}
+        <MorningBriefingCard
+          briefing={briefing}
+          source={briefingSource}
+          isLoading={isBriefingLoading}
+          items={items}
+          onRegenerate={handleRegenerateBriefing}
+        />
 
         {/* Personal Stylist entry */}
         <Link
