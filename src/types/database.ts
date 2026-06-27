@@ -369,6 +369,45 @@ export interface Database {
         }
         Relationships: []
       }
+      calendar_events: {
+        Row: {
+          id: string
+          user_id: string
+          title: string
+          description: string | null
+          start_at: string
+          end_at: string | null
+          location: string | null
+          source: string
+          external_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          title: string
+          description?: string | null
+          start_at: string
+          end_at?: string | null
+          location?: string | null
+          source?: string
+          external_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          title?: string
+          description?: string | null
+          start_at?: string
+          end_at?: string | null
+          location?: string | null
+          source?: string
+          external_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       style_memory: {
         Row: {
           id: string

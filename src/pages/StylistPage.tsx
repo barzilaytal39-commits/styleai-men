@@ -24,9 +24,11 @@ import { useFitCheck } from '@/hooks/useFitCheck'
 import { usePlanner, type PlanDayWithOutfit } from '@/hooks/usePlanner'
 import { useStylistChat, type StylistResponse } from '@/hooks/useStylistChat'
 import { useStyleMemory } from '@/hooks/useStyleMemory'
+import { useCalendarEvents, toEngineEvents } from '@/hooks/useCalendarEvents'
 import { useAuthStore } from '@/store/authStore'
 import { useToast } from '@/components/ui/toaster'
 import { buildPersonalContext } from '@/lib/personal-context'
+import { buildCalendarContext, type CalendarContext } from '@/lib/calendar-intelligence'
 import type { FeedbackKind } from '@/lib/style-memory'
 import type { StyleProfile, WardrobeItem, FitCheck, StyleMemory } from '@/types'
 
@@ -46,6 +48,7 @@ export function StylistPage() {
   const { fetchPlans, fetchPlan } = usePlanner()
   const { ask, isAsking } = useStylistChat()
   const { fetchMemory, recordFeedback } = useStyleMemory()
+  const { fetchEvents } = useCalendarEvents()
   const profile = useAuthStore((s) => s.profile)
   const { toast } = useToast()
 
@@ -54,6 +57,7 @@ export function StylistPage() {
   const [recentFitChecks, setRecentFitChecks] = useState<FitCheck[]>([])
   const [todayPlanDay, setTodayPlanDay] = useState<PlanDayWithOutfit | null>(null)
   const [memory, setMemory] = useState<StyleMemory | null>(null)
+  const [calendarCtx, setCalendarCtx] = useState<CalendarContext | null>(null)
 
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
@@ -69,18 +73,20 @@ export function StylistPage() {
   useEffect(() => {
     let active = true
     void (async () => {
-      const [profileRes, outfitsRes, fitRes, plansRes, memRes] = await Promise.all([
+      const [profileRes, outfitsRes, fitRes, plansRes, memRes, eventsRes] = await Promise.all([
         fetchStyleProfile(),
         fetchOutfits(),
         fetchFitChecks(),
         fetchPlans(),
         fetchMemory(),
+        fetchEvents(),
       ])
       if (!active) return
       if (profileRes.data) setStyleProfile(profileRes.data)
       setRecentOutfits(outfitsRes.data)
       setRecentFitChecks(fitRes.data)
       if (memRes.data) setMemory(memRes.data)
+      setCalendarCtx(buildCalendarContext(toEngineEvents(eventsRes.data)))
       if (plansRes.data.length > 0) {
         const { data: full } = await fetchPlan(plansRes.data[0].id)
         if (active && full) {
@@ -92,7 +98,7 @@ export function StylistPage() {
     return () => {
       active = false
     }
-  }, [fetchStyleProfile, fetchOutfits, fetchFitChecks, fetchPlans, fetchPlan, fetchMemory])
+  }, [fetchStyleProfile, fetchOutfits, fetchFitChecks, fetchPlans, fetchPlan, fetchMemory, fetchEvents])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -108,6 +114,7 @@ export function StylistPage() {
       recentFitChecks,
       todayPlanDay,
       styleMemory: memory,
+      calendar: calendarCtx,
     })
 
   const FEEDBACK_TOAST: Record<FeedbackKind, string> = {

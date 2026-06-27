@@ -125,6 +125,40 @@ export const COLOR_LABELS: Record<string, string> = {
   Purple: 'סגול', Pink: 'ורוד', Cream: 'קרם',
 }
 
+// Calendar event types + dress codes (Phase 8B). Keys = internal English values.
+export const EVENT_TYPE_LABELS_HE: Record<string, string> = {
+  office: 'משרד',
+  executive_meeting: 'ישיבת הנהלה',
+  presentation: 'מצגת',
+  client_meeting: 'פגישת לקוח',
+  site_visit: 'סיור שטח',
+  conference: 'כנס',
+  travel: 'נסיעה',
+  airport: 'שדה תעופה',
+  dinner: 'ארוחת ערב',
+  wedding: 'חתונה',
+  party: 'מסיבה',
+  date: 'דייט',
+  shopping: 'קניות',
+  family: 'משפחה',
+  casual: 'קז׳ואל',
+  workout: 'אימון',
+  unknown: 'אירוע',
+}
+
+export const DRESS_CODE_LABELS_HE: Record<string, string> = {
+  'Smart Casual': 'סמארט קז׳ואל',
+  'Smart Casual Premium': 'סמארט קז׳ואל פרימיום',
+  'Business Casual': 'עסקי קז׳ואל',
+  Business: 'עסקי',
+  Formal: 'רשמי',
+  'Comfortable Smart Casual': 'סמארט קז׳ואל נוח',
+  Casual: 'קז׳ואל',
+  Activewear: 'ספורטיבי',
+}
+
+export const eventTypeLabel = (v: string) => EVENT_TYPE_LABELS_HE[v] ?? v
+export const dressCodeLabel = (v: string) => (v ? DRESS_CODE_LABELS_HE[v] ?? v : '')
 export const subcategoryLabel = (v: string | null | undefined) => (v ? SUBCATEGORY_LABELS[v] ?? v : '')
 export const colorLabel = (v: string) => COLOR_LABELS[v] ?? v
 export const occasionLabel = (v: string) => OCCASION_LABELS[v] ?? v

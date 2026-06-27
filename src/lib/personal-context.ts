@@ -18,6 +18,7 @@ import { summarizeWeatherForAI } from '@/lib/weather'
 import { buildProfileSummary } from '@/lib/style-profile-constants'
 import { summarizeMemoryForAI } from '@/lib/style-memory'
 import { wardrobeHealth, shoppingGaps } from '@/lib/wardrobe-insights'
+import type { CalendarContext } from '@/lib/calendar-intelligence'
 
 const MAX_ITEMS = 60
 const CATEGORIES: WardrobeCategory[] = ['tops', 'bottoms', 'outerwear', 'shoes', 'accessories']
@@ -31,6 +32,9 @@ export interface PersonalContextInput {
   recentFitChecks?: { overall_score: number | null; final_verdict: string | null }[]
   todayPlanDay?: PlanDayWithOutfit | null
   styleMemory?: StyleMemory | null
+  // Forward-ready seam (Phase 8A): calendar context flows through to the AI once a
+  // calendar source is connected. Currently always null — nothing populates it yet.
+  calendar?: CalendarContext | null
   now?: Date
 }
 
@@ -60,6 +64,8 @@ export interface PersonalContext {
   recent_outfits: Record<string, unknown>[]
   recent_fit_checks: Record<string, unknown>[]
   weekly_plan: Record<string, unknown> | null
+  // Forward-ready (Phase 8A) — null until a calendar source is connected.
+  calendar: CalendarContext | null
 }
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -193,5 +199,6 @@ export function buildPersonalContext(input: PersonalContextInput = {}): Personal
     recent_outfits,
     recent_fit_checks,
     weekly_plan,
+    calendar: input.calendar ?? null,
   }
 }

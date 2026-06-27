@@ -22,12 +22,14 @@ import { useFitCheck } from '@/hooks/useFitCheck'
 import { usePlanner, type PlanDayWithOutfit } from '@/hooks/usePlanner'
 import { useOutfitRanking, type AIRanking } from '@/hooks/useOutfitRanking'
 import { useMorningBriefing, type MorningBriefing } from '@/hooks/useMorningBriefing'
+import { useCalendarEvents, toEngineEvents } from '@/hooks/useCalendarEvents'
 import { MorningBriefingCard } from '@/components/dashboard/MorningBriefingCard'
 import { buildProfileSummary } from '@/lib/style-profile-constants'
 import { buildPersonalContext } from '@/lib/personal-context'
+import { buildCalendarContext, type CalendarContext } from '@/lib/calendar-intelligence'
 import { buildOutfits, type GeneratedOutfit, type OutfitBrief, type Occasion } from '@/lib/outfit-engine'
 import { formatDate } from '@/lib/utils'
-import { t, styleLabel, occasionLabel } from '@/i18n'
+import { t, styleLabel, occasionLabel, eventTypeLabel, dressCodeLabel } from '@/i18n'
 import type { StyleProfile, WardrobeItem, OutfitSlot, FitCheck } from '@/types'
 
 const SLOT_ORDER: OutfitSlot[] = ['top', 'bottom', 'outerwear', 'shoes', 'belt', 'watch', 'fragrance']
@@ -120,6 +122,7 @@ export function DashboardPage() {
   const { fetchOutfits } = useOutfits()
   const { fetchFitChecks } = useFitCheck()
   const { fetchPlans, fetchPlan } = usePlanner()
+  const { fetchEvents } = useCalendarEvents()
   const { rankOutfits } = useOutfitRanking()
   const { generate: generateBriefing, isGenerating: isBriefingLoading } = useMorningBriefing()
 
@@ -131,6 +134,8 @@ export function DashboardPage() {
   const [planId, setPlanId] = useState<string | null>(null)
   const [todayPlanDay, setTodayPlanDay] = useState<PlanDayWithOutfit | null>(null)
   const [hasPlan, setHasPlan] = useState(false)
+  const [calendarCtx, setCalendarCtx] = useState<CalendarContext | null>(null)
+  const [hasEvents, setHasEvents] = useState(false)
 
   const [rec, setRec] = useState<{
     outfit: GeneratedOutfit
@@ -156,16 +161,19 @@ export function DashboardPage() {
   useEffect(() => {
     let active = true
     void (async () => {
-      const [profileRes, outfitsRes, fitRes, plansRes] = await Promise.all([
+      const [profileRes, outfitsRes, fitRes, plansRes, eventsRes] = await Promise.all([
         fetchStyleProfile(),
         fetchOutfits(),
         fetchFitChecks(),
         fetchPlans(),
+        fetchEvents(),
       ])
       if (!active) return
       if (profileRes.data) setStyleProfile(profileRes.data)
       setOutfits(outfitsRes.data)
       setLastFitCheck(fitRes.data[0] ?? null)
+      setHasEvents(eventsRes.data.length > 0)
+      setCalendarCtx(buildCalendarContext(toEngineEvents(eventsRes.data)))
 
       if (plansRes.data.length > 0) {
         setHasPlan(true)
@@ -181,7 +189,7 @@ export function DashboardPage() {
     return () => {
       active = false
     }
-  }, [fetchStyleProfile, fetchOutfits, fetchFitChecks, fetchPlans, fetchPlan])
+  }, [fetchStyleProfile, fetchOutfits, fetchFitChecks, fetchPlans, fetchPlan, fetchEvents])
 
   // Today's recommendation: rule engine first (instant), AI upgrade in background.
   // Runs at most ONCE per input signature; on AI failure it keeps the rule pick and
@@ -272,6 +280,7 @@ export function DashboardPage() {
       recentOutfits: outfits,
       recentFitChecks: lastFitCheck ? [lastFitCheck] : [],
       todayPlanDay,
+      calendar: calendarCtx,
     })
     const { data } = await generateBriefing(ctx)
     if (data) {
@@ -281,7 +290,7 @@ export function DashboardPage() {
       setBriefing(buildRuleBriefing())
       setBriefingSource('rule')
     }
-  }, [profile, styleProfile, weather, items, outfits, lastFitCheck, todayPlanDay, generateBriefing, buildRuleBriefing])
+  }, [profile, styleProfile, weather, items, outfits, lastFitCheck, todayPlanDay, calendarCtx, generateBriefing, buildRuleBriefing])
 
   // Fire exactly once after the dashboard data has settled (ref-guarded → one call).
   useEffect(() => {
@@ -509,6 +518,66 @@ export function DashboardPage() {
               <span className="text-sm font-medium">{t.dashboard.generatePlan}</span>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </Link>
+          )}
+        </section>
+
+        {/* Upcoming events — Calendar Intelligence (Phase 8B) */}
+        <section>
+          <SectionTitle>{t.dashboard.upcomingEvents}</SectionTitle>
+          {hasEvents && calendarCtx ? (
+            <Link
+              to="/calendar"
+              className="block rounded-2xl border border-border bg-card p-4 shadow-sm transition-colors hover:bg-accent/40"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 space-y-1.5">
+                  {calendarCtx.today_types.length > 0 ? (
+                    <p className="text-sm">
+                      <span className="font-semibold">{t.dashboard.eventsToday}: </span>
+                      <span className="text-muted-foreground">
+                        {calendarCtx.today_types.map(eventTypeLabel).join(', ')}
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{t.dashboard.noEventsToday}</p>
+                  )}
+                  {calendarCtx.tomorrow_types.length > 0 && (
+                    <p className="text-sm">
+                      <span className="font-semibold">{t.dashboard.eventsTomorrow}: </span>
+                      <span className="text-muted-foreground">
+                        {calendarCtx.tomorrow_types.map(eventTypeLabel).join(', ')}
+                      </span>
+                    </p>
+                  )}
+                  {calendarCtx.dress_code && (
+                    <p className="pt-0.5">
+                      <Badge variant="secondary">
+                        {t.calendar.dressCode}: {dressCodeLabel(calendarCtx.dress_code)}
+                      </Badge>
+                    </p>
+                  )}
+                </div>
+                <span className="flex shrink-0 items-center gap-0.5 text-xs font-medium text-muted-foreground">
+                  {t.calendar.manage}
+                  <ChevronRight className="h-4 w-4" />
+                </span>
+              </div>
+            </Link>
+          ) : (
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-dashed border-border p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <p className="text-sm text-muted-foreground">{t.calendar.empty}</p>
+              </div>
+              <Link
+                to="/calendar"
+                className="shrink-0 rounded-full bg-foreground px-3 py-1.5 text-xs font-medium text-background"
+              >
+                {t.calendar.addEvent}
+              </Link>
+            </div>
           )}
         </section>
 

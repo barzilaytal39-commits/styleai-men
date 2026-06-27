@@ -78,6 +78,7 @@ hooks + pages, never mixed into auth/profile/wardrobe code.
 | `/style-profile`      | `StyleProfilePage`  | Personal Style DNA (Phase 4A); entry from Profile page card + Settings |
 | `/stylist`            | `StylistPage`       | Personal Stylist chat (Phase 7A); Dashboard card + quick action |
 | `/memory`             | `MemoryInspectorPage` | Adaptive Style Memory inspector (Phase 7D); Dashboard quick action |
+| `/calendar`           | `CalendarPage`      | Manual calendar events — list/add/edit/delete (Phase 8B); Dashboard card |
 | `/settings`           | `SettingsPage`      | Protected                      |
 | `/wardrobe`           | `WardrobePage`      | Grid + category filter         |
 | `/wardrobe/insights`  | `WardrobeInsightsPage` | Health score + gaps (Phase 4.5B); entry from Wardrobe + Dashboard |
@@ -139,8 +140,12 @@ On a brand-new/empty Supabase project, run these in the SQL Editor top-to-bottom
 6. `supabase/migrations/20260626000000_style_memory.sql` — creates `style_memory`
    (Adaptive Style Memory, Phase 7D): one row per user of **structured learned
    preferences** (no chat history), owner-only RLS + `updated_at` trigger. Additive.
+7. `supabase/migrations/20260626010000_calendar_events.sql` — creates `calendar_events`
+   (Manual Calendar Events, Phase 8B): user-entered events (`source` default `'manual'`,
+   nullable `external_id` for future Google/Apple/Outlook sync), owner-only RLS,
+   `(user_id, start_at)` index, `updated_at` trigger. Idempotent, additive.
 
-After both run, the live DB matches `src/types/database.ts`.
+After all run, the live DB matches `src/types/database.ts`.
 
 > **App table name:** the app expects **`profiles`** (never `users`) — every query
 > uses `.from('profiles')`.
@@ -255,6 +260,11 @@ Check). `outfit_ratings` remains unused/unmirrored — add it when its feature i
   `feedback_counts` (jsonb), `saved_recommendations` (jsonb), timestamps. Owner-only
   RLS. Updated by the Memory Engine from Stylist feedback; summarized into the Smart
   Context for the stylist.
+
+- **`calendar_events`** (Phase 8B) — user-entered calendar events: `title`,
+  `description`, `start_at` (not null), `end_at`, `location`, `source` (default
+  `'manual'`), `external_id` (nullable, for future provider sync), timestamps. Owner-only
+  RLS. Fed through the Calendar Intelligence engine into the Smart Context (`calendar`).
 
 ### Row-level security
 
@@ -395,6 +405,10 @@ ShadCN-style, manually implemented (no CLI), Radix-backed where relevant:
   one `outfits`/`outfit_items` + `weekly_plan_days` per day), `fetchPlans()`,
   `fetchPlan(id)` (embeds days → outfit → items), `setDayWorn(dayId)`. Wear-history
   bumping reuses `useOutfits.markOutfitWorn` in the detail page.
+- `useCalendarEvents` — Phase 8B. `fetchEvents()` (ordered by `start_at`),
+  `createEvent` / `updateEvent` / `deleteEvent` (owner-scoped), plus `toEngineEvents(rows)`
+  mapping DB rows → the engine's `CalendarEvent[]`. Used by `CalendarPage`, and by the
+  Dashboard + Stylist to build the `calendar` Smart-Context field.
 - `useStyleMemory` — Phase 7D. `fetchMemory()` (maybeSingle), `recordFeedback(current,
   kind, items, savedText?)` (applies `applyFeedback` → upsert on `user_id`, returns the
   updated row), and `resetMemory()` (deletes the row). Used by the Stylist feedback
@@ -436,6 +450,16 @@ ShadCN-style, manually implemented (no CLI), Radix-backed where relevant:
   recently added / most versatile. `shoppingGaps(items, styleProfile, weather)` →
   prioritized gaps (missing categories/colors/formality/season + Style-DNA essentials
   for smart-casual/premium + weather-specific boots/coat) with reason + outfit impact.
+- `calendar-intelligence.ts` — **Calendar Intelligence Engine** (Phase 8A, pure; no
+  AI/APIs/DB). Layered for pluggability: *Event Source* (future `CalendarSource`
+  adapters → `CalendarEvent[]`) → *Classification* (`classifyEvent`, deterministic
+  Hebrew+English keywords → 17 `EventType`s) → *Calendar Context*
+  (`buildCalendarContext(events)` → today/tomorrow/this-week summaries, `event_types`,
+  `dress_code`, `busiest_day`, earliest/latest event, `recommendations`). Exposes
+  `DRESS_CODE_BY_TYPE`, `EVENT_TYPE_LABELS`, `dressCodeForType`. Context strings are
+  English (localize at UI later). **No calendar source is connected yet** — this is
+  foundation only; a forward-ready `calendar` seam exists on `PersonalContext` (null
+  for now) so a future source flows to the AI without downstream changes.
 - `style-memory.ts` — **Adaptive Style Memory engine** (Phase 7D, pure). Two layers:
   *session* (component state during a chat) and *persistent* (`style_memory` table).
   `applyFeedback(current, kind, items, savedText?)` derives the next persistent values
@@ -699,6 +723,34 @@ reads `ANTHROPIC_API_KEY` from Supabase Edge **secrets** only (never a `VITE_` v
   top pick, "לפי כללים" badge) and the Dashboard still renders. A **regenerate** button
   forces a fresh briefing. Cached in local component state only (not persisted).
   Needs `morning-briefing` deployed + `ANTHROPIC_API_KEY`.
+
+**13. Manual Calendar Events (Phase 8B — DONE)**
+- New `calendar_events` table + `useCalendarEvents` (+ `toEngineEvents`). `/calendar`
+  page (`CalendarPage`): list upcoming events, add/edit/delete via a form (title,
+  description, start, end, location); each row shows its classified **event type label**
+  and **suggested dress code** via `calendar-intelligence.ts`.
+- Dashboard "אירועים קרובים" card is now **live**: with events it shows today/tomorrow
+  event types + suggested dress code and links to `/calendar` ("נהל יומן"); with none it
+  shows "אין אירועים ביומן עדיין" + "הוסף אירוע". (The disabled "חבר יומן" placeholder is
+  retired.)
+- Smart Context: Dashboard + Stylist build a `CalendarContext` from manual events and
+  pass it via `buildPersonalContext({ calendar })`, so the `calendar` field now reaches
+  `morning-briefing` and `stylist-chat` request bodies. **Edge Function prompts are
+  unchanged** (no consumption yet) — **no redeploy required**.
+- Weekly Planner generation logic unchanged. Still no Google Calendar / OAuth / external
+  APIs.
+
+**12. Calendar Intelligence Engine (Phase 8A — DONE)**
+- `src/lib/calendar-intelligence.ts` — deterministic, pluggable foundation for future
+  calendar integration (Google/Apple/Outlook). Classifies events (Hebrew+English
+  keywords) and builds a `CalendarContext` (summaries, dress code, busiest day,
+  earliest/latest, recommendations). **No Google Calendar / OAuth / external APIs** —
+  context only, no outfit generation.
+- Dashboard shows an **"אירועים קרובים"** placeholder card: "אין יומן מחובר עדיין" +
+  a **disabled** "חבר יומן" button.
+- Morning Briefing prep only: a `calendar` field is wired through `buildPersonalContext`
+  / `PersonalContext` (currently always `null`) — the seam to plug a calendar source in
+  later without changing downstream code. Not consumed by any Edge Function yet.
 
 **11. Adaptive Style Memory (Phase 7D — DONE)**
 - New `style_memory` table (structured learned preferences only — **no chat history**)
