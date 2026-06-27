@@ -386,6 +386,66 @@ export function DashboardPage() {
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
         </Link>
 
+        {/* Upcoming events — Calendar Intelligence (Phase 8B) */}
+        <section>
+          <SectionTitle>{t.dashboard.upcomingEvents}</SectionTitle>
+          {hasEvents && calendarCtx ? (
+            <Link
+              to="/calendar"
+              className="block rounded-2xl border border-border bg-card p-4 shadow-sm transition-colors hover:bg-accent/40"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 space-y-1.5">
+                  {calendarCtx.today_types.length > 0 ? (
+                    <p className="text-sm">
+                      <span className="font-semibold">{t.dashboard.eventsToday}: </span>
+                      <span className="text-muted-foreground">
+                        {calendarCtx.today_types.map(eventTypeLabel).join(', ')}
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{t.dashboard.noEventsToday}</p>
+                  )}
+                  {calendarCtx.tomorrow_types.length > 0 && (
+                    <p className="text-sm">
+                      <span className="font-semibold">{t.dashboard.eventsTomorrow}: </span>
+                      <span className="text-muted-foreground">
+                        {calendarCtx.tomorrow_types.map(eventTypeLabel).join(', ')}
+                      </span>
+                    </p>
+                  )}
+                  {calendarCtx.dress_code && (
+                    <p className="pt-0.5">
+                      <Badge variant="secondary">
+                        {t.calendar.dressCode}: {dressCodeLabel(calendarCtx.dress_code)}
+                      </Badge>
+                    </p>
+                  )}
+                </div>
+                <span className="flex shrink-0 items-center gap-0.5 text-xs font-medium text-muted-foreground">
+                  {t.calendar.manage}
+                  <ChevronRight className="h-4 w-4" />
+                </span>
+              </div>
+            </Link>
+          ) : (
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-dashed border-border p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <p className="text-sm text-muted-foreground">{t.calendar.empty}</p>
+              </div>
+              <Link
+                to="/calendar"
+                className="shrink-0 rounded-full bg-foreground px-3 py-1.5 text-xs font-medium text-background"
+              >
+                {t.calendar.addEvent}
+              </Link>
+            </div>
+          )}
+        </section>
+
         {/* Today's recommendation */}
         <section>
           <SectionTitle>{t.dashboard.todayOutfit}</SectionTitle>
@@ -518,66 +578,6 @@ export function DashboardPage() {
               <span className="text-sm font-medium">{t.dashboard.generatePlan}</span>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </Link>
-          )}
-        </section>
-
-        {/* Upcoming events — Calendar Intelligence (Phase 8B) */}
-        <section>
-          <SectionTitle>{t.dashboard.upcomingEvents}</SectionTitle>
-          {hasEvents && calendarCtx ? (
-            <Link
-              to="/calendar"
-              className="block rounded-2xl border border-border bg-card p-4 shadow-sm transition-colors hover:bg-accent/40"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 space-y-1.5">
-                  {calendarCtx.today_types.length > 0 ? (
-                    <p className="text-sm">
-                      <span className="font-semibold">{t.dashboard.eventsToday}: </span>
-                      <span className="text-muted-foreground">
-                        {calendarCtx.today_types.map(eventTypeLabel).join(', ')}
-                      </span>
-                    </p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">{t.dashboard.noEventsToday}</p>
-                  )}
-                  {calendarCtx.tomorrow_types.length > 0 && (
-                    <p className="text-sm">
-                      <span className="font-semibold">{t.dashboard.eventsTomorrow}: </span>
-                      <span className="text-muted-foreground">
-                        {calendarCtx.tomorrow_types.map(eventTypeLabel).join(', ')}
-                      </span>
-                    </p>
-                  )}
-                  {calendarCtx.dress_code && (
-                    <p className="pt-0.5">
-                      <Badge variant="secondary">
-                        {t.calendar.dressCode}: {dressCodeLabel(calendarCtx.dress_code)}
-                      </Badge>
-                    </p>
-                  )}
-                </div>
-                <span className="flex shrink-0 items-center gap-0.5 text-xs font-medium text-muted-foreground">
-                  {t.calendar.manage}
-                  <ChevronRight className="h-4 w-4" />
-                </span>
-              </div>
-            </Link>
-          ) : (
-            <div className="flex items-center justify-between gap-3 rounded-2xl border border-dashed border-border p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <p className="text-sm text-muted-foreground">{t.calendar.empty}</p>
-              </div>
-              <Link
-                to="/calendar"
-                className="shrink-0 rounded-full bg-foreground px-3 py-1.5 text-xs font-medium text-background"
-              >
-                {t.calendar.addEvent}
-              </Link>
-            </div>
           )}
         </section>
 
