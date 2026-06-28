@@ -1,4 +1,4 @@
-import type { WardrobeCategory } from '@/types'
+import type { WardrobeCategory, WardrobeItem } from '@/types'
 
 export const CATEGORIES: { id: WardrobeCategory; label: string }[] = [
   { id: 'tops', label: 'Tops' },
@@ -13,8 +13,55 @@ export const SUBCATEGORIES: Record<WardrobeCategory, string[]> = {
   bottoms: ['Jeans', 'Chinos', 'Trousers', 'Shorts', 'Sweatpants', 'Cargos'],
   outerwear: ['Jacket', 'Blazer', 'Coat', 'Puffer', 'Raincoat', 'Bomber', 'Cardigan'],
   shoes: ['Sneakers', 'Boots', 'Loafers', 'Dress Shoes', 'Sandals', 'Slip-Ons'],
-  accessories: ['Watch', 'Belt', 'Bag', 'Hat', 'Tie', 'Scarf', 'Sunglasses', 'Wallet'],
+  // Watch / Fragrance / Belt live here as subcategories — the DB has only the five
+  // broad categories above (CHECK constraint). The wardrobe UI splits them into their
+  // own filter chips (see WARDROBE_FILTERS) without needing new DB categories.
+  accessories: ['Watch', 'Fragrance', 'Belt', 'Bag', 'Hat', 'Tie', 'Scarf', 'Sunglasses', 'Wallet'],
 }
+
+// Accessory subcategories that get their own user-facing filter chip.
+const ACCESSORY_SPECIAL = ['Watch', 'Fragrance', 'Belt']
+const subEquals = (item: WardrobeItem, sub: string) =>
+  item.category === 'accessories' && (item.subcategory ?? '').toLowerCase() === sub.toLowerCase()
+
+export type WardrobeFilterId =
+  | 'all'
+  | 'tops'
+  | 'bottoms'
+  | 'shoes'
+  | 'outerwear'
+  | 'watches'
+  | 'fragrances'
+  | 'belts'
+  | 'accessories'
+
+// Single source of truth for the wardrobe filter chips. Maps the broad DB categories
+// (+ accessory subcategories) to the richer user-facing set. Labels are localized in
+// the UI via t.wardrobe.filters[id]; predicates run against stored English values.
+export const WARDROBE_FILTERS: {
+  id: WardrobeFilterId
+  emoji: string
+  predicate: (item: WardrobeItem) => boolean
+}[] = [
+  { id: 'all', emoji: '', predicate: () => true },
+  { id: 'tops', emoji: '👕', predicate: (i) => i.category === 'tops' },
+  { id: 'bottoms', emoji: '👖', predicate: (i) => i.category === 'bottoms' },
+  { id: 'shoes', emoji: '👟', predicate: (i) => i.category === 'shoes' },
+  { id: 'outerwear', emoji: '🧥', predicate: (i) => i.category === 'outerwear' },
+  { id: 'watches', emoji: '⌚', predicate: (i) => subEquals(i, 'Watch') },
+  { id: 'fragrances', emoji: '🧴', predicate: (i) => subEquals(i, 'Fragrance') },
+  { id: 'belts', emoji: '🧵', predicate: (i) => subEquals(i, 'Belt') },
+  {
+    id: 'accessories',
+    emoji: '🎒',
+    predicate: (i) =>
+      i.category === 'accessories' &&
+      !ACCESSORY_SPECIAL.some((s) => (i.subcategory ?? '').toLowerCase() === s.toLowerCase()),
+  },
+]
+
+export const filterPredicate = (id: WardrobeFilterId) =>
+  (WARDROBE_FILTERS.find((f) => f.id === id) ?? WARDROBE_FILTERS[0]).predicate
 
 export const SIZES_BY_CATEGORY: Record<WardrobeCategory, string[]> = {
   tops: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'],

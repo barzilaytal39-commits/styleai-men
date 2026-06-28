@@ -1,15 +1,16 @@
 import { create } from 'zustand'
-import type { WardrobeItem, WardrobeCategory } from '@/types'
+import type { WardrobeItem } from '@/types'
+import type { WardrobeFilterId } from '@/lib/wardrobe-constants'
 
 interface WardrobeState {
   items: WardrobeItem[]
   isLoaded: boolean
-  activeCategory: WardrobeCategory | 'all'
+  activeCategory: WardrobeFilterId
   setItems: (items: WardrobeItem[]) => void
   addItem: (item: WardrobeItem) => void
   updateItem: (id: string, updated: WardrobeItem) => void
   removeItem: (id: string) => void
-  setActiveCategory: (category: WardrobeCategory | 'all') => void
+  setActiveCategory: (category: WardrobeFilterId) => void
   reset: () => void
 }
 

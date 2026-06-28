@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/authStore'
 import { useWardrobeStore } from '@/store/wardrobeStore'
+import { filterPredicate } from '@/lib/wardrobe-constants'
 import type { WardrobeItemInsert, WardrobeItemUpdate } from '@/types'
 
 export function useWardrobe() {
@@ -189,7 +190,7 @@ export function useWardrobe() {
   )
 
   const filteredItems =
-    activeCategory === 'all' ? items : items.filter((i) => i.category === activeCategory)
+    activeCategory === 'all' ? items : items.filter(filterPredicate(activeCategory))
 
   return {
     items,

@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { CategoryFilter } from '@/components/wardrobe/CategoryFilter'
 import { ItemCard } from '@/components/wardrobe/ItemCard'
 import { useWardrobe } from '@/hooks/useWardrobe'
-import { CATEGORIES } from '@/lib/wardrobe-constants'
+import { WARDROBE_FILTERS, type WardrobeFilterId } from '@/lib/wardrobe-constants'
 import { t } from '@/i18n'
 
 export function WardrobePage() {
@@ -19,8 +19,15 @@ export function WardrobePage() {
   }, [isLoaded, fetchItems])
 
   const counts = Object.fromEntries(
-    CATEGORIES.map(({ id }) => [id, items.filter((i) => i.category === id).length])
-  )
+    WARDROBE_FILTERS.map((f) => [f.id, items.filter(f.predicate).length]),
+  ) as Record<WardrobeFilterId, number>
+
+  const overview = [
+    { key: 'total', value: items.length },
+    { key: 'analyzed', value: items.filter((i) => i.ai_analyzed_at).length },
+    { key: 'neverWorn', value: items.filter((i) => i.worn_count === 0).length },
+    { key: 'favorites', value: items.filter((i) => i.favorite).length },
+  ] as const
 
   return (
     <AppLayout hideHeader>
@@ -60,6 +67,20 @@ export function WardrobePage() {
 
       {/* Content */}
       <div className="pt-2">
+        {/* Overview strip */}
+        {isLoaded && items.length > 0 && (
+          <div className="mb-3 flex items-stretch divide-x divide-border rounded-2xl border border-border bg-card [direction:rtl]">
+            {overview.map(({ key, value }) => (
+              <div key={key} className="flex flex-1 flex-col items-center justify-center px-2 py-2.5">
+                <span className="text-lg font-bold leading-none">{value}</span>
+                <span className="mt-1 text-[11px] text-muted-foreground">
+                  {t.wardrobe.overview[key]}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {!isLoaded ? (
           /* Skeleton grid */
           <div className="grid grid-cols-2 gap-3">

@@ -190,7 +190,7 @@ Extends `auth.users` 1:1 (PK = `auth.users.id`, `ON DELETE CASCADE`).
 | `user_id`      | uuid FK     | → `auth.users.id`, `ON DELETE CASCADE`                     |
 | `name`         | text        | required                                                   |
 | `category`     | text        | CHECK in `tops/bottoms/outerwear/shoes/accessories`       |
-| `subcategory`  | text        |                                                           |
+| `subcategory`  | text        | e.g. `Watch` / `Fragrance` / `Belt` for accessories       |
 | `brand`        | text        |                                                           |
 | `color`        | text[]      | default `{}` (color *names*, not hex)                      |
 | `size`         | text        |                                                           |
@@ -209,6 +209,16 @@ Extends `auth.users` 1:1 (PK = `auth.users.id`, `ON DELETE CASCADE`).
 | `ai_analyzed_at`   | timestamptz | Last analyzed; NULL = never analyzed                  |
 | `created_at`   | timestamptz |                                                           |
 | `updated_at`   | timestamptz | auto-updated via trigger                                   |
+
+> **Broad DB categories vs. user-facing wardrobe filters (Phase 8B.1).** The DB stores
+> only the **five broad categories** above (CHECK constraint) — no separate
+> watch/fragrance/belt categories. The Wardrobe screen presents a **richer filter set**
+> (👕 חולצות, 👖 מכנסיים, 👟 נעליים, 🧥 שכבות, ⌚ שעונים, 🧴 בשמים, 🧵 חגורות, 🎒 אקססוריז)
+> by mapping chips to predicates in `src/lib/wardrobe-constants.ts` → `WARDROBE_FILTERS`.
+> **Watch / Fragrance / Belt are `accessories` rows distinguished by `subcategory`**; the
+> 🎒 אקססוריז chip is "accessories excluding Watch/Fragrance/Belt". This needs **no DB
+> migration** — the broad categories already cover the UX. `filterPredicate(id)` is the
+> single source the store/hook filter on and the page counts on.
 
 ### Forward-looking tables (created, not yet used by the UI)
 
@@ -723,6 +733,20 @@ reads `ANTHROPIC_API_KEY` from Supabase Edge **secrets** only (never a `VITE_` v
   top pick, "לפי כללים" badge) and the Dashboard still renders. A **regenerate** button
   forces a fresh briefing. Cached in local component state only (not persisted).
   Needs `morning-briefing` deployed + `ANTHROPIC_API_KEY`.
+
+**13.1 Wardrobe UX Completion (Phase 8B.1 — DONE)**
+- Wardrobe filter chips now cover the full wardrobe: 👕 חולצות, 👖 מכנסיים, 👟 נעליים,
+  🧥 שכבות, ⌚ שעונים, 🧴 בשמים, 🧵 חגורות, 🎒 אקססוריז, plus הכל — defined once in
+  `WARDROBE_FILTERS` (id + emoji + predicate). Empty sub-filters are hidden to avoid
+  iPhone-width overflow; each chip shows a live item count.
+- ⌚/🧴/🧵 filter `accessories` by `subcategory` (Watch/Fragrance/Belt, case-insensitive);
+  🎒 is the remaining accessories. **No new DB categories / no migration.**
+- Add/Edit form now exposes **Fragrance** as an accessory subcategory (Watch/Belt already
+  existed), so watches/fragrances/belts are enterable; labels Hebrew, values English.
+- New compact **Overview strip** on the Wardrobe screen: total / analyzed / never-worn /
+  favorites.
+- Store `activeCategory` is now `WardrobeFilterId`; `useWardrobe.filteredItems` filters via
+  `filterPredicate(activeCategory)`. UX/UI only — no schema/Edge/engine changes.
 
 **13. Manual Calendar Events (Phase 8B — DONE)**
 - New `calendar_events` table + `useCalendarEvents` (+ `toEngineEvents`). `/calendar`
